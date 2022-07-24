@@ -56,7 +56,7 @@
 
 #include <vector>
 
-
+#define ON_WAY_FLASH 1
 
 /*
  * Compute CRC for message.
@@ -173,7 +173,7 @@ int main( int argc, char**argv )
       exit( 1 );
     }
 
-    if ( (  (int)strtol(argv[1], NULL, 16) < 1 )
+    if ( (  (int)strtol(argv[1], NULL, 16) < 0 )
         || ((int)strtol(argv[1], NULL, 16) > 255)
        )
     {
@@ -266,7 +266,7 @@ int main( int argc, char**argv )
     int fd;
     int wlen = 0;
 
-    const char *io = "/dev/ttyUSB0";
+    const char *io = "/dev/cu.usbserial-14210";
 
     fd = open( io, O_RDWR | O_NOCTTY | O_SYNC );
 
@@ -338,25 +338,31 @@ int main( int argc, char**argv )
         {
           printf( "%02x", msg[i] );
         }
-        printf("]");
+        printf("]\n");
 
-        // small buffer
-        unsigned char buf[40];
+        #ifdef ON_WAY_FLASH
+            // wait some time for the MCU to write frame to flash
+            usleep(100000);
+        #else
+            // small buffer
+            unsigned char buf[40];
+            
+            // read header
+            printf("\nRX:");
+            for ( int i = 0; i < 6; i++ )
+            {
+            read( fd, &buf[i], 0x1 );
+            printf( " %02x", buf[i] );
+            }
+            // read crc
+            for ( int i = 0; i < 2; i++ )
+            read( fd, &buf[i], 0x1 );
 
-        // read header
-        printf("\nRX:");
-        for ( int i = 0; i < 6; i++ )
-        {
-          read( fd, &buf[i], 0x1 );
-          printf( " %02x", buf[i] );
-        }
-        // read crc
-        for ( int i = 0; i < 2; i++ )
-          read( fd, &buf[i], 0x1 );
+            unsigned char locrc = buf[0];
+            unsigned char hicrc = buf[1];
+            printf( " CRC [0x%02x%02x]\n\n", locrc, hicrc );
+        #endif    
 
-        unsigned char locrc = buf[0];
-        unsigned char hicrc = buf[1];
-        printf( " CRC [0x%02x%02x]\n\n", locrc, hicrc );
         fflush( stdout );
 
         // reset message buffer
